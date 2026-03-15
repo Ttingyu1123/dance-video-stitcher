@@ -102,7 +102,7 @@ const EASING_OPTIONS: Array<{ value: EasingType; label: string }> = [
   { value: 'spring', label: 'Spring' },
 ];
 const BEZIER_PRESETS = [
-  { value: 'soft', label: 'Soft', points: DEFAULT_BEZIER_POINTS },
+  { value: 'soft', label: 'Soft', points: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
   { value: 'ease-out', label: 'Ease Out', points: { x1: 0.215, y1: 0.61, x2: 0.355, y2: 1 } },
   { value: 'ease-in', label: 'Ease In', points: { x1: 0.55, y1: 0.055, x2: 0.675, y2: 0.19 } },
   { value: 'ease-in-out', label: 'Ease In-Out', points: { x1: 0.645, y1: 0.045, x2: 0.355, y2: 1 } },

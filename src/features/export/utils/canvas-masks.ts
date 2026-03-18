@@ -9,6 +9,7 @@ import type { ShapeItem, TimelineTrack } from '@/types/timeline';
 import type { ItemKeyframes } from '@/types/keyframe';
 import type { ResolvedTransform } from '@/types/transform';
 import {
+  type PreviewPathVerticesOverride,
   getShapePath,
   rotatePath,
   resolveActiveShapeMasksAtFrame,
@@ -16,6 +17,7 @@ import {
 
 interface MaskEntry {
   mask: ShapeItem;
+  trackOrder: number;
   startFrame: number;
   endFrame: number;
 }
@@ -25,6 +27,7 @@ interface PreparedMask {
   inverted: boolean;
   feather: number;
   maskType: 'clip' | 'alpha';
+  trackOrder: number;
 }
 
 export interface MaskFrameIndex {
@@ -93,6 +96,7 @@ function getMaskPath(
     inverted: mask.maskInvert ?? false,
     feather,
     maskType,
+    trackOrder: 0,
   };
 }
 
@@ -114,6 +118,7 @@ function collectMasks(
       if (item.type === 'shape' && item.isMask) {
         masks.push({
           mask: item,
+          trackOrder: track.order ?? 0,
           startFrame: item.from,
           endFrame: item.from + item.durationInFrames,
         });
@@ -230,6 +235,7 @@ export function applyMasks(
     inverted: boolean;
     feather: number;
     maskType: 'clip' | 'alpha';
+    trackOrder?: number;
   }>,
   canvas: MaskCanvasSettings
 ): void {
@@ -298,9 +304,10 @@ export function buildMaskFrameIndex(
   const masks = collectMasks(tracks);
   const indexedMasks: MaskEntry[] = [];
 
-  for (const { mask } of masks) {
+  for (const { mask, trackOrder } of masks) {
     indexedMasks.push({
       mask,
+      trackOrder,
       startFrame: mask.from,
       endFrame: mask.from + mask.durationInFrames,
     });
@@ -317,31 +324,38 @@ export function getActiveMasksForFrame(
   frame: number,
   canvas: MaskCanvasSettings,
   keyframesMap: Map<string, ItemKeyframes>,
-  getPreviewTransformOverride?: (itemId: string) => Partial<ResolvedTransform> | undefined
+  getPreviewTransformOverride?: (itemId: string) => Partial<ResolvedTransform> | undefined,
+  getPreviewPathVerticesOverride?: PreviewPathVerticesOverride,
 ): Array<{
   path: Path2D;
   inverted: boolean;
   feather: number;
   maskType: 'clip' | 'alpha';
+  trackOrder: number;
 }> {
   const activeMasks: Array<{
     path: Path2D;
     inverted: boolean;
     feather: number;
     maskType: 'clip' | 'alpha';
+    trackOrder: number;
   }> = [];
   const activeMaskShapes = resolveActiveShapeMasksAtFrame(
-    index.masks.map(({ mask }) => mask),
+    index.masks.map(({ mask, trackOrder }) => ({ mask, trackOrder })),
     {
       canvas,
       frame,
       getKeyframes: (itemId) => keyframesMap.get(itemId),
       getPreviewTransform: getPreviewTransformOverride,
+      getPreviewPathVertices: getPreviewPathVerticesOverride,
     }
   );
 
   for (const mask of activeMaskShapes) {
-    activeMasks.push(getMaskPath(mask.shape, mask.transform, canvas));
+    activeMasks.push({
+      ...getMaskPath(mask.shape, mask.transform, canvas),
+      trackOrder: mask.trackOrder,
+    });
   }
 
   return activeMasks;
@@ -360,12 +374,14 @@ export function prepareMasks(
   frame: number,
   canvas: MaskCanvasSettings,
   keyframesMap: Map<string, ItemKeyframes> = new Map(),
-  getPreviewTransformOverride?: (itemId: string) => Partial<ResolvedTransform> | undefined
+  getPreviewTransformOverride?: (itemId: string) => Partial<ResolvedTransform> | undefined,
+  getPreviewPathVerticesOverride?: PreviewPathVerticesOverride,
 ): Array<{
   path: Path2D;
   inverted: boolean;
   feather: number;
   maskType: 'clip' | 'alpha';
+  trackOrder: number;
 }> {
   const index = buildMaskFrameIndex(tracks, canvas);
   const preparedMasks = getActiveMasksForFrame(
@@ -373,7 +389,8 @@ export function prepareMasks(
     frame,
     canvas,
     keyframesMap,
-    getPreviewTransformOverride
+    getPreviewTransformOverride,
+    getPreviewPathVerticesOverride,
   );
 
   return preparedMasks;

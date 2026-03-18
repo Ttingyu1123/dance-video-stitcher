@@ -2,25 +2,38 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getShapePathMock: vi.fn(
-    (_mask: unknown, transform: { x: number }) => `M ${transform.x} 0 L 10 0 Z`
+    (mask: { pathVertices?: Array<{ position: [number, number] }> }, transform: { x: number }) => {
+      const previewMarker = mask.pathVertices?.[0]?.position[0] ?? 0;
+      return `M ${transform.x} ${previewMarker} L 10 0 Z`;
+    }
   ),
   rotatePathMock: vi.fn((path: string) => path),
   resolveActiveShapeMasksAtFrameMock: vi.fn(
-    (masks: Array<{ id: string }>, options: {
+    (masks: Array<{ id?: string; mask?: { id: string }; trackOrder?: number }>, options: {
       frame: number;
       getPreviewTransform?: (itemId: string) => { x?: number } | undefined;
-    }) => masks.map((shape) => ({
-      shape,
-      transform: {
-        x: options.getPreviewTransform?.(shape.id)?.x ?? options.frame,
-        y: 0,
-        width: 100,
-        height: 100,
-        rotation: 0,
-        opacity: 1,
-        cornerRadius: 0,
-      },
-    }))
+      getPreviewPathVertices?: (itemId: string) => Array<{ position: [number, number] }> | undefined;
+    }) => masks.map((maskSource) => {
+      const baseShape = maskSource.mask ?? maskSource;
+      const shapeId = baseShape.id ?? 'mask';
+      const previewPathVertices = options.getPreviewPathVertices?.(shapeId);
+      const shape = previewPathVertices
+        ? { ...baseShape, pathVertices: previewPathVertices }
+        : baseShape;
+      return {
+        shape,
+        trackOrder: maskSource.trackOrder ?? 0,
+        transform: {
+          x: options.getPreviewTransform?.(shapeId)?.x ?? options.frame,
+          y: 0,
+          width: 100,
+          height: 100,
+          rotation: 0,
+          opacity: 1,
+          cornerRadius: 0,
+        },
+      };
+    })
   ),
 }));
 
@@ -92,16 +105,17 @@ describe('canvas mask animation', () => {
 
     expect(frame10Masks).toHaveLength(1);
     expect(frame12Masks).toHaveLength(1);
+    expect(frame10Masks[0]?.trackOrder).toBe(0);
     expect((frame10Masks[0]!.path as { value?: string }).value).toContain('10');
     expect((frame12Masks[0]!.path as { value?: string }).value).toContain('12');
     expect(mocks.resolveActiveShapeMasksAtFrameMock).toHaveBeenNthCalledWith(
       1,
-      [track.items[0]],
+      [{ mask: track.items[0], trackOrder: 0 }],
       expect.objectContaining({ frame: 10 })
     );
     expect(mocks.resolveActiveShapeMasksAtFrameMock).toHaveBeenNthCalledWith(
       2,
-      [track.items[0]],
+      [{ mask: track.items[0], trackOrder: 0 }],
       expect.objectContaining({ frame: 12 })
     );
   });
@@ -119,5 +133,44 @@ describe('canvas mask animation', () => {
 
     expect(activeMasks).toHaveLength(1);
     expect((activeMasks[0]!.path as { value?: string }).value).toContain('99');
+  });
+
+  it('applies preview path vertex overrides to mask geometry', () => {
+    const pathTrack = {
+      ...track,
+      items: [
+        {
+          ...track.items[0],
+          id: 'mask-path',
+          shapeType: 'path' as const,
+          pathVertices: [
+            {
+              position: [0.25, 0.25] as [number, number],
+              inHandle: [0.25, 0.25] as [number, number],
+              outHandle: [0.25, 0.25] as [number, number],
+            },
+          ],
+        },
+      ],
+    };
+    const index = buildMaskFrameIndex([pathTrack], canvas);
+
+    const activeMasks = getActiveMasksForFrame(
+      index,
+      10,
+      canvas,
+      new Map(),
+      undefined,
+      () => [
+        {
+          position: [0.8, 0.25],
+          inHandle: [0.8, 0.25],
+          outHandle: [0.8, 0.25],
+        },
+      ],
+    );
+
+    expect(activeMasks).toHaveLength(1);
+    expect((activeMasks[0]!.path as { value?: string }).value).toContain('0.8');
   });
 });

@@ -58,9 +58,11 @@ import { CanvasPool, TextMeasurementCache } from './canvas-pool';
 import { SharedVideoExtractorPool, type VideoFrameSource } from './shared-video-extractor';
 import { getCompositeOperation } from '@/types/blend-mode-css';
 import { useCompositionsStore } from '@/features/export/deps/timeline';
+import { doesMaskAffectTrack } from '@/shared/utils/mask-scope';
 
 // Item renderer
 import {
+  type PreviewPathVerticesOverride,
   resolveFrameCompositionScene,
   resolveCompositionRenderPlan,
   collectFrameVideoCandidates,
@@ -124,6 +126,7 @@ export async function createCompositionRenderer(
     getPreviewTransformOverride?: (itemId: string) => Partial<ResolvedTransform> | undefined;
     getPreviewEffectsOverride?: (itemId: string) => ItemEffect[] | undefined;
     getPreviewCornerPinOverride?: (itemId: string) => TimelineItem['cornerPin'] | undefined;
+    getPreviewPathVerticesOverride?: PreviewPathVerticesOverride;
     domVideoElementProvider?: (itemId: string) => HTMLVideoElement | null;
   } = {},
 ) {
@@ -138,6 +141,7 @@ export async function createCompositionRenderer(
   const getPreviewTransformOverride = options.getPreviewTransformOverride;
   const getPreviewEffectsOverride = options.getPreviewEffectsOverride;
   const getPreviewCornerPinOverride = options.getPreviewCornerPinOverride;
+  const getPreviewPathVerticesOverride = options.getPreviewPathVerticesOverride;
   const domVideoElementProvider = options.domVideoElementProvider;
   const hasDom = typeof document !== 'undefined';
   const previewStrictDecode = renderMode === 'preview';
@@ -418,6 +422,7 @@ export async function createCompositionRenderer(
     keyframesMap,
     adjustmentLayers,
     getPreviewEffectsOverride,
+    getPreviewPathVerticesOverride,
     subCompRenderData,
     gpuPipeline: null,
     gpuTransitionPipeline: null,
@@ -746,6 +751,7 @@ export async function createCompositionRenderer(
 
             // Pre-assign items to tracks and filter out audio/adjustment
             const sortedWithItems = sorted.map(t => ({
+              order: t.order ?? 0,
               visible: t.visible !== false,
               items: subComp.items.filter(
                 i => i.trackId === t.id && i.type !== 'audio' && i.type !== 'adjustment'
@@ -1009,7 +1015,8 @@ export async function createCompositionRenderer(
         frame,
         maskSettings,
         keyframesMap,
-        renderMode === 'preview' ? getPreviewTransformOverride : undefined
+        renderMode === 'preview' ? getPreviewTransformOverride : undefined,
+        renderMode === 'preview' ? getPreviewPathVerticesOverride : undefined,
       );
 
       const frameScene = resolveFrameCompositionScene({
@@ -1018,6 +1025,7 @@ export async function createCompositionRenderer(
         canvas: canvasSettings,
         getKeyframes: (itemId) => keyframesMap.get(itemId),
         getPreviewTransform: renderMode === 'preview' ? getPreviewTransformOverride : undefined,
+        getPreviewPathVertices: renderMode === 'preview' ? getPreviewPathVerticesOverride : undefined,
       });
       const { activeTransitions, transitionClipIds } = frameScene.transitionFrameState;
 
@@ -1303,6 +1311,25 @@ export async function createCompositionRenderer(
           )).length;
         }
 
+        const applyTrackScopedMasks = (
+          result: { source: OffscreenCanvas; poolCanvases: OffscreenCanvas[] } | null,
+          trackOrder: number,
+        ): { source: OffscreenCanvas; poolCanvases: OffscreenCanvas[] } | null => {
+          if (!result) return null;
+
+          const applicableMasks = activeMasks.filter((mask) => doesMaskAffectTrack(mask.trackOrder, trackOrder));
+          if (applicableMasks.length === 0) {
+            return result;
+          }
+
+          const { canvas: maskedCanvas, ctx: maskedCtx } = canvasPool.acquire();
+          applyMasks(maskedCtx, result.source, applicableMasks, maskSettings);
+          return {
+            source: maskedCanvas,
+            poolCanvases: [...result.poolCanvases, maskedCanvas],
+          };
+        };
+
         // Fire all item renders in parallel (video decodes run concurrently)
         const results = await Promise.all(
           renderTasks.map(async (task) => {
@@ -1337,10 +1364,10 @@ export async function createCompositionRenderer(
           const layerTextures: GPUTexture[] = [];
 
           for (let i = 0; i < results.length; i++) {
-            const result = results[i];
+            const task = renderTasks[i]!;
+            const result = applyTrackScopedMasks(results[i] ?? null, task.trackOrder);
             if (!result) continue;
 
-            const task = renderTasks[i]!;
             const blendMode = task.type === 'item' ? (task.item.blendMode ?? 'normal') : 'normal';
 
             // Upload item canvas to GPU texture
@@ -1406,10 +1433,10 @@ export async function createCompositionRenderer(
         } else {
           // Canvas2D compositing fallback
           for (let i = 0; i < results.length; i++) {
-            const result = results[i];
+            const task = renderTasks[i]!;
+            const result = applyTrackScopedMasks(results[i] ?? null, task.trackOrder);
             if (!result) continue;
 
-            const task = renderTasks[i]!;
             const blendMode = task.type === 'item' ? task.item.blendMode : undefined;
             if (blendMode && blendMode !== 'normal') {
               contentCtx.globalCompositeOperation = getCompositeOperation(blendMode);
@@ -1431,12 +1458,7 @@ export async function createCompositionRenderer(
         log.debug(`Occlusion culling: skipped ${skippedTracks} tracks at frame ${frame}`);
       }
 
-      // Apply masks to content
-      if (activeMasks.length > 0) {
-        applyMasks(ctx, contentCanvas, activeMasks, maskSettings);
-      } else {
-        ctx.drawImage(contentCanvas, 0, 0);
-      }
+      ctx.drawImage(contentCanvas, 0, 0);
 
       // Release content canvas back to pool
       canvasPool.release(contentCanvas);

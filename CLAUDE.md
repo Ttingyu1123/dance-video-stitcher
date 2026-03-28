@@ -1,6 +1,48 @@
-# FreeCut Web
+# Dance Video Stitcher (based on FreeCut)
 
-## Commands
+Video editor with audio-based clip alignment. Fork of FreeCut with custom `audio-alignment` feature module.
+
+## Quick Start
+
+```bash
+# One-click launch (both services):
+start.bat
+
+# Or manually:
+cd py-backend && python main.py    # Backend API on port 8765
+npm run dev                        # Editor UI on port 5173
+```
+
+## Custom Features (added on top of FreeCut)
+
+### Audio Alignment (Align tab)
+- **Feature module**: `src/features/audio-alignment/components/alignment-panel.tsx`
+- **Backend API client**: `src/features/audio-alignment/services/alignment-api.ts`
+- **Integration point**: `src/features/editor/components/media-sidebar.tsx` — `handleAlignComplete` callback
+- **Python backend**: `py-backend/backend/audio_analysis.py` — chroma cross-correlation engine
+- **API base**: `http://localhost:8765` (CORS enabled)
+- **Algorithm**: STFT → 12 pitch classes → fftconvolve → waveform refinement
+
+### Video Converter (Convert tab)
+- **Component**: `src/features/audio-alignment/components/converter-panel.tsx`
+- **Backend endpoint**: `POST /api/convert` — ffmpeg format/resize/quality conversion
+
+### Key integration details
+- Sidebar tabs defined in `src/shared/state/editor/types.ts` (`activeTab` union type)
+- Categories array in `media-sidebar.tsx` — add `{ id, icon, label }` + content `<div>`
+- `sourceStart`/`sourceEnd`/`sourceDuration` on timeline items are **source-native FPS frames**, NOT seconds (see PITFALLS.md #4)
+- Backend filenames have UUID prefix (`045c6aeb_file.mp4`) — strip with `/^[a-f0-9]{8}_/` before matching media library
+- `insertTrack` is a hook method, NOT on the store — don't call from `getState()` (see PITFALLS.md #7)
+
+###踩坑記錄
+See `PITFALLS.md` for 10 documented issues and solutions.
+
+## Obsidian Backup
+
+Project docs mirrored to: `D:\Dropbox\應用程式\remotely-save\Obsidian_dropbox\03_Projects\Video-Stitch\`
+When updating CLAUDE.md or README.md, also update the Obsidian copy.
+
+## FreeCut Commands
 
 ```bash
 npm run dev          # Vite dev server on port 5173

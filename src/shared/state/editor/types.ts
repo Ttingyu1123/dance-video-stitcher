@@ -4,7 +4,7 @@ export interface EditorState {
   activePanel: 'media' | 'effects' | 'properties' | null;
   leftSidebarOpen: boolean;
   rightSidebarOpen: boolean;
-  activeTab: 'media' | 'text' | 'shapes' | 'effects' | 'transitions';
+  activeTab: 'media' | 'text' | 'shapes' | 'effects' | 'transitions' | 'align' | 'converter';
   clipInspectorTab: ClipInspectorTab;
   sidebarWidth: number;
   rightSidebarWidth: number;
@@ -19,7 +19,7 @@ export interface EditorActions {
   setRightSidebarOpen: (open: boolean) => void;
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
-  setActiveTab: (tab: 'media' | 'text' | 'shapes' | 'effects' | 'transitions') => void;
+  setActiveTab: (tab: 'media' | 'text' | 'shapes' | 'effects' | 'transitions' | 'align' | 'converter') => void;
   setClipInspectorTab: (tab: ClipInspectorTab) => void;
   setSidebarWidth: (width: number) => void;
   setRightSidebarWidth: (width: number) => void;

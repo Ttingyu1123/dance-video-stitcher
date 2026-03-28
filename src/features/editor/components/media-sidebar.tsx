@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useEffect, memo, Activity } from 'react';
+import { useCallback, useMemo, useRef, useEffect, useState, memo, Activity } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,13 +15,18 @@ import {
   Sparkles,
   Blend,
   Pen,
+  AudioLines,
+  FileOutput,
 } from 'lucide-react';
+import { AlignmentPanel, ConverterPanel } from '@/features/audio-alignment';
+import type { AlignmentResult } from '@/features/audio-alignment';
+import { resolveMediaUrl } from '@/features/media-library/utils/media-resolver';
 import { useEditorStore } from '@/shared/state/editor';
 import { useTimelineStore } from '@/features/editor/deps/timeline-store';
 import { usePlaybackStore } from '@/shared/state/playback';
 import { useSelectionStore } from '@/shared/state/selection';
 import { useProjectStore } from '@/features/editor/deps/projects';
-import { MediaLibrary } from '@/features/editor/deps/media-library';
+import { MediaLibrary, useMediaLibraryStore } from '@/features/editor/deps/media-library';
 import { TransitionsPanel } from './transitions-panel';
 import { findNearestAvailableSpace } from '@/features/editor/deps/timeline-utils';
 import type { TextItem, ShapeItem, ShapeType, AdjustmentItem } from '@/types/timeline';
@@ -345,6 +350,140 @@ export const MediaSidebar = memo(function MediaSidebar() {
   const presetIds = useMemo(() => EFFECT_PRESETS.map((p) => p.id), []);
   const { previews: effectPreviews, trigger: triggerPreviews } = useEffectPreviews(allEffectEntries, presetIds);
 
+  // ─── Audio Alignment ───
+
+  // Get media files for alignment panel
+  const getMediaFilesForAlignment = useCallback(async () => {
+    const { mediaItems } = useMediaLibraryStore.getState();
+    const videoItems = mediaItems.filter((m) => m.mimeType.startsWith('video/'));
+    const result: Array<{ id: string; name: string; file?: File; blobUrl?: string }> = [];
+
+    for (const item of videoItems) {
+      if (item.fileHandle) {
+        try {
+          const file = await item.fileHandle.getFile();
+          result.push({ id: item.id, name: item.fileName, file });
+        } catch {
+          result.push({ id: item.id, name: item.fileName });
+        }
+      } else {
+        result.push({ id: item.id, name: item.fileName });
+      }
+    }
+    return result;
+  }, []);
+
+  const [alignMediaFiles, setAlignMediaFiles] = useState<Array<{ id: string; name: string; file?: File; blobUrl?: string }>>([]);
+
+  // Load media files when Align tab is activated
+  useEffect(() => {
+    if (activeTab === 'align') {
+      getMediaFilesForAlignment().then(setAlignMediaFiles);
+    }
+  }, [activeTab, getMediaFilesForAlignment]);
+
+  // Place clips on timeline after alignment
+  const handleAlignComplete = useCallback(async (results: AlignmentResult[], _refDuration: number) => {
+    const { tracks, fps, addItem } = useTimelineStore.getState();
+    const { selectItems } = useSelectionStore.getState();
+    const { mediaItems } = useMediaLibraryStore.getState();
+
+    if (tracks.length === 0) {
+      logger.warn('No tracks. Please add tracks first (click + in TRACKS).');
+      return;
+    }
+
+    // Clear existing items from all tracks before placing aligned clips
+    const { removeItems } = useTimelineStore.getState();
+    const existingItems = useTimelineStore.getState().items;
+    if (existingItems.length > 0) {
+      console.log(`[AudioAlign] Removing ${existingItems.length} existing items`);
+      removeItems(existingItems.map((item) => item.id));
+    }
+
+    const sortedResults = [...results].sort((a, b) => a.offset_sec - b.offset_sec);
+    const newItemIds: string[] = [];
+
+    console.log('[AudioAlign] Placing clips:');
+
+    for (let i = 0; i < sortedResults.length; i++) {
+      const result = sortedResults[i]!;
+      // Cycle through available tracks: clip 0 → track 0, clip 1 → track 1, etc.
+      // If more clips than tracks, wrap around
+      const targetTrack = tracks[i % tracks.length];
+      if (!targetTrack) continue;
+
+      const originalName = result.filename.replace(/^[a-f0-9]{8}_/, '');
+      const media = mediaItems.find(
+        (m) => m.fileName === originalName || m.fileName === result.filename
+      );
+
+      if (!media) {
+        console.warn(`[AudioAlign] No match for "${result.filename}" → "${originalName}". Library has: ${mediaItems.map(m => m.fileName).join(', ')}`);
+        continue;
+      }
+
+      let blobUrl = '';
+      try {
+        blobUrl = await resolveMediaUrl(media.id);
+      } catch (err) {
+        logger.warn(`Failed to resolve blob URL for ${media.fileName}`, err);
+      }
+
+      const startFrame = Math.round(result.offset_sec * fps);
+      const durationFrames = Math.round(result.duration_sec * fps);
+      const itemId = crypto.randomUUID();
+      newItemIds.push(itemId);
+
+      // sourceStart/sourceEnd/sourceDuration are in source-native FPS frames
+      const sourceFps = media.fps || fps;
+      const sourceDurationFrames = Math.round(media.duration * sourceFps);
+      const sourceEndFrames = Math.round(result.duration_sec * sourceFps);
+
+      const item = {
+        id: itemId,
+        originId: crypto.randomUUID(),
+        type: 'video' as const,
+        trackId: targetTrack.id,
+        from: startFrame,
+        durationInFrames: durationFrames,
+        mediaId: media.id,
+        src: blobUrl,
+        fileName: media.fileName,
+        sourceStart: 0,
+        sourceEnd: Math.min(sourceEndFrames, sourceDurationFrames),
+        sourceDuration: sourceDurationFrames,
+        sourceFps: sourceFps,
+        width: media.width,
+        height: media.height,
+        speed: 1,
+        trimStart: 0,
+        trimEnd: 0,
+        volume: 1,
+        isMuted: false,
+        transform: {
+          x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1,
+          anchorX: 0.5, anchorY: 0.5,
+        },
+        effects: [],
+        blendMode: 'normal',
+      };
+
+      console.log(`[AudioAlign] → "${media.fileName}" on ${targetTrack.name} at ${result.offset_sec.toFixed(1)}s (frame ${startFrame})`);
+
+      try {
+        addItem(item as any);
+      } catch (err) {
+        console.error(`[AudioAlign] addItem failed for ${media.fileName}:`, err);
+      }
+    }
+
+    if (newItemIds.length > 0) {
+      selectItems(newItemIds);
+      console.log(`[AudioAlign] Done: placed ${newItemIds.length} clips`);
+    }
+  }, []);
+
   // Category items for the vertical nav
   const categories = [
     { id: 'media' as const, icon: Film, label: 'Media' },
@@ -352,6 +491,8 @@ export const MediaSidebar = memo(function MediaSidebar() {
     { id: 'shapes' as const, icon: Pentagon, label: 'Shapes' },
     { id: 'effects' as const, icon: Layers, label: 'Effects' },
     { id: 'transitions' as const, icon: Blend, label: 'Transitions' },
+    { id: 'align' as const, icon: AudioLines, label: 'Align' },
+    { id: 'converter' as const, icon: FileOutput, label: 'Convert' },
   ];
 
   return (
@@ -639,6 +780,19 @@ export const MediaSidebar = memo(function MediaSidebar() {
           {/* Transitions Tab */}
           <div className={`flex-1 overflow-hidden ${activeTab === 'transitions' ? 'block' : 'hidden'}`}>
             <TransitionsPanel />
+          </div>
+
+          {/* Align Tab */}
+          <div className={`flex-1 overflow-hidden ${activeTab === 'align' ? 'block' : 'hidden'}`}>
+            <AlignmentPanel
+              mediaFiles={alignMediaFiles}
+              onAlignComplete={handleAlignComplete}
+            />
+          </div>
+
+          {/* Converter Tab */}
+          <div className={`flex-1 overflow-hidden ${activeTab === 'converter' ? 'block' : 'hidden'}`}>
+            <ConverterPanel />
           </div>
           </div>
         </Activity>

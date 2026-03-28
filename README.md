@@ -1,269 +1,111 @@
-# FreeCut
+# Dance Video Stitcher
 
-**[freecut.net](http://freecut.net/)**
+Video editor with audio-based clip alignment. Built on [FreeCut](https://github.com/walterlow/freecut).
 
-**Edit videos. In your browser.**
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-![FreeCut Timeline Editor](./public/assets/landing/timeline.png)
-
-FreeCut is a browser-based multi-track video editor. No installation, no uploads — everything runs locally in your browser using WebGPU, WebCodecs, OPFS, and the File System Access API.
-
-## Features
-
-### Timeline & Editing
-
-- Multi-track timeline with video, audio, text, image, and shape tracks
-- Track groups with mute/visible/locked propagation
-- Trim, split, join, ripple delete, and rate stretch tools
-- Rolling edit, ripple edit, slip, and slide tools
-- Per-track "Close Gaps" to remove empty space between clips
-- Filmstrip thumbnails and audio waveform visualization
-- Pre-compositions (nested compositions, 1 level deep)
-- Markers for organizing your edit
-- Source monitor with mark in/out via playhead or skimmer and insert/overwrite edits
-- Undo/redo with configurable history depth
-
-### GPU Effects
-
-All visual effects are WebGPU-accelerated.
-
-- **Blur** — gaussian, box, motion, radial, zoom
-- **Color** — brightness, contrast, exposure, hue shift, saturation, vibrance, temperature/tint, levels, curves, color wheels, grayscale, sepia, invert
-- **Distortion** — pixelate, RGB split, twirl, wave, bulge/pinch, kaleidoscope, mirror, fluted glass
-- **Stylize** — vignette, film grain, sharpen, posterize, glow, edge detect, scanlines, color glitch
-- **Keying** — chroma key (green/blue screen) with tolerance, softness, and spill suppression
-
-### Blend Modes
-
-25 GPU-accelerated blend modes: normal, darken, multiply, color burn, linear burn, lighten, screen, color dodge, linear dodge, overlay, soft light, hard light, vivid light, linear light, pin light, hard mix, difference, exclusion, subtract, divide, hue, saturation, color, luminosity.
-
-### Masks
-
-Layer masks with keyframeable geometry transforms for compositing and selective effect application.
-
-### Transitions
-
-- **CPU transitions** — fade, wipe, slide, 3D flip, clock wipe, iris — each with directional variants
-- **GPU transitions** — dissolve, sparkles, glitch, light leak, pixelate, chromatic aberration, radial blur
-- Adjustable duration and alignment
-
-### Keyframe Animation
-
-- Bezier curve editor with preset easing functions
-- Easing: linear, ease-in, ease-out, ease-in-out, cubic-bezier, spring
-- Auto-keyframe mode with dopesheet toggle
-- Graph editor, dopesheet, and split view
-
-### Preview & Playback
-
-- Real-time WebGPU-composited preview with transform gizmo (drag, resize, rotate)
-- Frame-accurate playback via custom Clock engine
-- GPU scopes — waveform, vectorscope, histogram
-- Snap guides and timecode display
-
-### Export
-
-- In-browser rendering via WebCodecs (no server required)
-- **Video containers:** MP4, WebM, MOV, MKV
-- **Video codecs:** H.264, H.265, VP8, VP9, AV1
-- **Audio codecs:** AAC, Opus, MP3, FLAC, PCM (WAV)
-- Quality presets: low (2 Mbps), medium (5 Mbps), high (10 Mbps), ultra (20 Mbps)
-
-### Media
-
-- Import via File System Access API — files are referenced, never copied
-- **Video:** MP4, WebM, MOV, MKV
-- **Audio:** MP3, WAV, AAC, OGG, Opus
-- **Image:** JPG, PNG, GIF (animated), WebP
-- Up to 5 GB per file
-- OPFS proxy video generation for smooth preview
-- Media relinking for moved or deleted files
-- Scene detection and optical flow analysis
-
-### Transcription
-
-- Browser-based speech-to-text via Whisper (runs locally in a Web Worker)
-- Models: tiny, base, small, medium, large
-- Auto-generate caption text items from transcripts
-- Multi-language support
-
-### Other
-
-- Native SVG shapes — rectangle, circle, triangle, ellipse, star, polygon, heart
-- Text overlays with custom fonts, colors, and positioning
-- Project bundles — export/import projects as ZIP files with Zod-validated schemas
-- IndexedDB persistence with content-addressable storage
-- Auto-save
-- Customizable keyboard shortcuts with preset import/export
-- Configurable settings (FPS, snap, waveforms, filmstrips, preview quality, export defaults, undo depth, auto-save interval)
+Automatically aligns dance class video clips by audio cross-correlation, then lets you edit on a full-featured timeline.
 
 ## Quick Start
 
-**Prerequisites:** Node.js 18+
-
 ```bash
-git clone https://github.com/walterlow/freecut.git
-cd freecut
-npm install
-npm run dev
+# One-click launch:
+start.bat
+
+# Or manually:
+cd py-backend && python main.py    # Backend API (port 8765)
+npm run dev                        # Editor UI (port 5173)
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in Chrome.
+**Requirements:** Node.js 18+, Python 3.10+, ffmpeg in PATH, Chrome 113+
 
-### Workflow
+## Project Structure
 
-1. Create a project from the projects page
-2. Import media by dragging files into the media library
-3. Drag clips to the timeline — trim, arrange, add effects and transitions
-4. Animate with the keyframe editor
-5. Preview your edit in real time
-6. Export directly from the browser
-
-## Browser Support
-
-Chrome 113+ required. FreeCut uses WebGPU, WebCodecs, OPFS, and the File System Access API which are not yet available in all browsers.
-
-### Brave
-
-Brave disables the File System Access API by default. To enable it:
-
-1. Navigate to `brave://flags/#file-system-access-api`
-2. Change the setting from **Disabled** to **Enabled**
-3. Click **Relaunch** to restart the browser
-
-## Keyboard Shortcuts
-
-| Action | Shortcut |
-|---|---|
-| Play / Pause | `Space` |
-| Previous / Next frame | `Left` / `Right` |
-| Previous / Next snap point | `Up` / `Down` |
-| Go to start / end | `Home` / `End` |
-| Split at playhead | `Ctrl+K` |
-| Split at cursor | `Shift+C` |
-| Join clips | `Shift+J` |
-| Delete selected | `Delete` |
-| Ripple delete | `Ctrl+Delete` |
-| Freeze frame | `Shift+F` |
-| Nudge item (1px / 10px) | `Shift+Arrow` / `Ctrl+Shift+Arrow` |
-| Undo / Redo | `Ctrl+Z` / `Ctrl+Shift+Z` |
-| Copy / Cut / Paste | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` |
-| Selection tool | `V` |
-| Razor tool | `C` |
-| Rate stretch tool | `R` |
-| Rolling edit tool | `N` |
-| Ripple edit tool | `B` |
-| Slip tool | `Y` |
-| Slide tool | `U` |
-| Toggle snap | `S` |
-| Add / Remove marker | `M` / `Shift+M` |
-| Previous / Next marker | `[` / `]` |
-| Add keyframe | `A` |
-| Clear keyframes | `Shift+A` |
-| Toggle keyframe editor | `Ctrl+Shift+A` |
-| Keyframe view: graph / dopesheet / split | `1` / `2` / `3` |
-| Group / Ungroup tracks | `Ctrl+G` / `Ctrl+Shift+G` |
-| Mark In / Out | `I` / `O` |
-| Clear In/Out | `Alt+X` |
-| Insert / Overwrite edit | `,` / `.` |
-| Zoom in / out | `Ctrl+=` / `Ctrl+-` |
-| Zoom to fit | `\` |
-| Zoom to 100% | `Shift+\` |
-| Save | `Ctrl+S` |
-| Export | `Ctrl+Shift+E` |
-
-## Tech Stack
-
-- [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
-- [Vite](https://vitejs.dev/) — build tool with HMR
-- [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) — GPU-accelerated effects, compositing, and scopes
-- [Zustand](https://github.com/pmndrs/zustand) + [Zundo](https://github.com/charkour/zundo) — state management with undo/redo
-- [TanStack Router](https://tanstack.com/router) — file-based type-safe routing
-- [Tailwind CSS 4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) — styling and UI components
-- [Mediabunny](https://mediabunny.dev/) — media decoding and metadata extraction
-- [WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API) — composition rendering and export
-- [OPFS](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system) + [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) — local persistence
-- Web Workers — heavy processing off the main thread
-
-## Development
-
-```bash
-npm run dev            # Dev server on port 5173
-npm run build          # Production build
-npm run lint           # ESLint
-npm run check:boundaries # Feature boundary architecture check
-npm run check:deps-contracts # Enforce deps contract seam routing
-npm run check:legacy-lib-imports # Block any "@/lib/*" usage
-npm run check:deps-wrapper-health # Fail on unused pass-through deps wrappers
-npm run check:edge-budgets # Feature seam coupling budget check
-npm run report:feature-edges # Feature dependency edge report
-npm run report:feature-edges:json # JSON feature edge report
-npm run report:deps-wrapper-health:json # JSON deps wrapper health report
-npm run verify         # Boundaries + deps contracts + no-lib guard + wrapper health + edge budgets + lint + build
-npm run test           # Vitest (watch mode)
-npm run test:run       # Vitest (single run)
-npm run test:coverage  # Vitest with coverage
-npm run routes         # Regenerate TanStack Router route tree
+```
+video_stitch_editor/
+├── start.bat                          # One-click launcher
+├── py-backend/                        # Python audio alignment backend
+│   ├── main.py                        # Backend entry point
+│   └── backend/
+│       ├── server.py                  # FastAPI routes
+│       ├── audio_analysis.py          # Chroma cross-correlation engine
+│       ├── video_processing.py        # ffmpeg wrappers
+│       └── project_manager.py         # Project state (JSON)
+├── src/features/audio-alignment/      # Custom feature module
+│   ├── components/
+│   │   ├── alignment-panel.tsx        # Align sidebar tab
+│   │   └── converter-panel.tsx        # Convert sidebar tab
+│   ├── services/
+│   │   └── alignment-api.ts           # Backend API client
+│   └── index.ts
+├── src/features/editor/               # FreeCut editor (modified)
+├── src/features/timeline/             # FreeCut timeline
+└── ...                                # FreeCut core files
 ```
 
-### Environment
+## Workflow
 
-```env
-VITE_SHOW_DEBUG_PANEL=true   # Show debug panel in dev (default: true)
-```
+### Audio Alignment (custom feature)
 
-### Project Structure
+1. Open editor → left sidebar **Media** tab → Import video clips
+2. Switch to **Align** tab (waveform icon)
+3. Optionally upload a reference song
+4. Click **Auto-Align** → clips auto-placed on timeline at correct music positions
+5. Each clip on its own track, overlapping regions visible
+6. Use Split (S) to cut, delete unwanted parts, adjust positions
+7. Export final video
 
-```text
-src/
-|- app/                     # App bootstrap and providers
-|- domain/                  # Framework-agnostic domain logic
-|  |- animation/             # Easing functions and interpolation
-|  |- projects/              # Project domain types
-|  \- timeline/              # Transitions (engine, registry, renderers)
-|- infrastructure/          # Browser/storage/GPU adapters
-|- lib/
-|  |- gpu-effects/           # WebGPU effect pipeline + shader definitions
-|  |- gpu-transitions/       # WebGPU transition pipeline + shaders
-|  |- gpu-compositor/        # WebGPU blend mode compositor
-|  |- gpu-scopes/            # WebGPU waveform/vectorscope/histogram
-|  |- masks/                 # Mask texture management
-|  |- analysis/              # Optical flow and scene detection
-|  |- thumbnails/            # GPU-accelerated thumbnail renderer
-|  |- fonts/                 # Font loading
-|  |- shapes/                # Shape path generators
-|  \- migrations/            # Data migration system
-|- features/
-|  |- editor/                # Editor shell, toolbar, panels, stores
-|  |- timeline/              # Multi-track timeline, actions, services
-|  |- preview/               # Preview canvas, transform gizmo, GPU scopes
-|  |- player/                # Playback engine (Clock, composition)
-|  |- composition-runtime/   # Composition rendering (sequences/items/audio/transitions)
-|  |- export/                # WebCodecs export pipeline (Web Worker)
-|  |- effects/               # GPU effect system and UI panels
-|  |- keyframes/             # Keyframe animation, Bezier editor, easing
-|  |- media-library/         # Media import, metadata, OPFS proxies, transcription
-|  |- project-bundle/        # Project ZIP export/import
-|  |- projects/              # Project management
-|  \- settings/              # App settings, keyboard shortcut editor
-|- shared/                  # Shared UI/state/utilities across layers
-|- components/ui/            # shadcn/ui components
-|- config/hotkeys.ts         # Keyboard shortcut definitions
-|- routes/                   # TanStack Router (file-based)
-\- types/                    # Shared TypeScript types
-```
+### Video Converter (custom feature)
 
-Architecture boundary policy and migration plan: `docs/architecture-boundaries.md`
+Left sidebar → **Convert** tab:
+- Select file → choose format/resolution/quality → Convert → Download
 
-## Contributing
+## FreeCut Editor Quick Reference
 
-FreeCut is open source but not open contribution — pull requests are not accepted at this time.
+| Action | How |
+|--------|-----|
+| **Import media** | Media tab → Import, or drag from file explorer |
+| **Add to timeline** | Drag from Media panel to a Track |
+| **Split/Cut** | Select clip → press **S** or click ✂️ |
+| **Delete** | Select → **Delete** |
+| **Trim edges** | Drag clip edges |
+| **Move clip** | Drag clip on timeline |
+| **Play/Pause** | **Space** |
+| **Undo** | **Ctrl+Z** |
+| **Add text** | Text tab in sidebar |
+| **Add effects** | Effects tab in sidebar |
+| **Transitions** | Overlap two clips, or drag from Transitions tab |
+| **Speed change** | Select clip → Properties panel → Media → Speed |
+| **Export** | Top-right **Export** button |
 
-- **Report bugs** — open an issue
-- **Suggest features** — start a discussion
+## Audio Alignment Algorithm
 
-## License
+1. Extract audio from each video → mono WAV 22050Hz (ffmpeg)
+2. Compute chroma features: STFT (window=4096, hop=2048) → 12 pitch classes → L2 normalize
+3. Cross-correlate each clip's chroma against reference song's chroma
+4. Peak of summed correlation = time offset; confidence = peak prominence
+5. Refine with raw waveform correlation in ±2s window for ~1ms accuracy
 
-[MIT](LICENSE)
+**Why chroma**: captures harmonic pitch, ignores broadband noise (teacher voice, ambient sounds)
+
+## Supported Formats
+
+| Type | Formats |
+|------|---------|
+| Video input | MP4, MOV, AVI, MKV, WebM |
+| Audio (reference) | MP3, WAV, FLAC, AAC, OGG |
+| Video export | MP4, WebM, MOV, MKV (via FreeCut) |
+| Converter output | MP4, MOV, MKV, WebM, AVI |
+
+## Key Design Decisions
+
+| Decision | Why |
+|----------|-----|
+| FreeCut as base | Full-featured browser editor with timeline, waveforms, playback — no need to build from scratch |
+| Python backend | scipy/numpy for audio analysis, ffmpeg for video processing |
+| Chroma not MFCC | Noise-robust for classroom recordings |
+| Each clip on own track | Overlapping regions visible for manual cut decisions |
+| Reference optional | Auto-uses longest clip if no song file |
+
+## Obsidian Backup
+
+Project documentation mirrored to:
+`D:\Dropbox\應用程式\remotely-save\Obsidian_dropbox\03_Projects\Video-Stitch\`

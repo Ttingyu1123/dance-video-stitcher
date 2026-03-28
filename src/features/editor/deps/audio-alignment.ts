@@ -1,7 +1,5 @@
 /**
- * Adapter exports for audio-alignment dependencies.
- * Editor modules should import audio-alignment components/types from here.
+ * Compatibility adapter that re-exports through audio-alignment-contract.
  */
 
-export { AlignmentPanel, ConverterPanel } from '@/features/audio-alignment';
-export type { AlignmentResult } from '@/features/audio-alignment';
+export * from './audio-alignment-contract';

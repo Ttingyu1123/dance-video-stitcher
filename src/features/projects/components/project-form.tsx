@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Link } from '@tanstack/react-router';
+import { Video } from 'lucide-react';
 import {
   projectFormSchema,
   type ProjectFormData,
@@ -64,6 +65,61 @@ export function ProjectForm({
   }, [defaultValues?.width, defaultValues?.height]);
 
   const fps = watch('fps');
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [detectStatus, setDetectStatus] = useState<string>('');
+
+  const handleDetectFromVideo = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ''; // reset for re-selection
+
+    setDetectStatus('Reading video...');
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+
+    const objectUrl = URL.createObjectURL(file);
+    video.src = objectUrl;
+
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
+
+    video.onloadedmetadata = () => {
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+
+      let detectedFps = 30;
+
+      // Set form values
+      setValue('width', w, { shouldValidate: true });
+      setValue('height', h, { shouldValidate: true });
+      setValue('fps', detectedFps, { shouldValidate: true });
+
+      // Match template or go custom
+      const matched = PROJECT_TEMPLATES.find((t) => t.width === w && t.height === h);
+      if (matched) {
+        setSelectedTemplateId(matched.id);
+        // Use template's FPS if it exists
+        detectedFps = matched.fps;
+        setValue('fps', detectedFps, { shouldValidate: true });
+      } else {
+        setSelectedTemplateId('custom');
+      }
+
+      // Also set project name from filename if name is still default
+      const currentName = watch('name');
+      if (!currentName || currentName === DEFAULT_PROJECT_VALUES.name) {
+        const nameFromFile = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        setValue('name', nameFromFile, { shouldValidate: true });
+      }
+
+      setDetectStatus(`Detected ${w}×${h} @ ${detectedFps}fps from ${file.name}`);
+      cleanup();
+    };
+
+    video.onerror = () => {
+      setDetectStatus('Could not read video metadata. Try a different file.');
+      cleanup();
+    };
+  }, [setValue, watch]);
 
   const handleSelectTemplate = (template: ProjectTemplate) => {
     setSelectedTemplateId(template.id);
@@ -154,6 +210,29 @@ export function ProjectForm({
              </div>
 
              <div className="space-y-6">
+               {/* Auto-detect from video */}
+               <div className="flex items-center gap-3">
+                 <Button
+                   type="button"
+                   variant="outline"
+                   className="gap-2"
+                   onClick={() => videoInputRef.current?.click()}
+                 >
+                   <Video className="h-4 w-4" />
+                   Detect from video
+                 </Button>
+                 {detectStatus && (
+                   <span className="text-xs text-muted-foreground">{detectStatus}</span>
+                 )}
+                 <input
+                   ref={videoInputRef}
+                   type="file"
+                   accept="video/*,.mp4,.mov,.avi,.mkv,.webm"
+                   className="hidden"
+                   onChange={handleDetectFromVideo}
+                 />
+               </div>
+
                {/* Resolution — visual template picker */}
                <div>
                  <p className="text-sm font-medium text-foreground mb-3">Resolution</p>

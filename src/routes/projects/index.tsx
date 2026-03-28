@@ -1,11 +1,12 @@
-﻿import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState, useRef } from 'react';
+﻿import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { createLogger } from '@/shared/logging/logger';
 
 const logger = createLogger('ProjectsIndex');
 import { Button } from '@/components/ui/button';
 import { Plus, Upload, FolderOpen, File } from 'lucide-react';
+import { useCreateProject } from '@/features/projects/hooks/use-project-actions';
 import { ProjectList } from '@/features/projects/components/project-list';
 import { ProjectForm } from '@/features/projects/components/project-form';
 import {
@@ -77,6 +78,30 @@ function ProjectsIndex() {
   const isLoading = useProjectsLoading();
   const error = useProjectsError();
   const { loadProjects, updateProject } = useProjectActions();
+  const createProject = useCreateProject();
+
+  // Quick-create: skip form, use defaults, auto-detect resolution on first media import
+  const handleQuickCreate = useCallback(async () => {
+    const now = new Date();
+    const name = `Project ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const result = await createProject({
+      name,
+      description: '',
+      width: 1920,
+      height: 1080,
+      fps: 30,
+    });
+
+    if (result.success && result.project) {
+      navigate({
+        to: '/editor/$projectId',
+        params: { projectId: result.project.id },
+      });
+    } else {
+      toast.error('Failed to create project', { description: result.error });
+    }
+  }, [createProject, navigate]);
 
   // Load projects on mount
   useEffect(() => {
@@ -248,12 +273,10 @@ function ProjectsIndex() {
                 <Upload className="w-4 h-4" />
                 Import Project
               </Button>
-              <Link to="/projects/new">
-                <Button size="lg" className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  New Project
-                </Button>
-              </Link>
+              <Button size="lg" className="gap-2" onClick={handleQuickCreate}>
+                <Plus className="w-4 h-4" />
+                New Project
+              </Button>
             </div>
 
             {/* Hidden file input for import */}

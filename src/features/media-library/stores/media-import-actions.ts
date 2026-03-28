@@ -5,8 +5,46 @@ import { proxyService } from '../services/proxy-service';
 import { getMimeType } from '../utils/validation';
 import { getSharedProxyKey } from '../utils/proxy-key';
 import { createLogger, createOperationId } from '@/shared/logging/logger';
+import { useProjectStore } from '../deps/projects-contract';
 
 const logger = createLogger('MediaImport');
+
+/**
+ * Auto-detect project resolution from the first imported video.
+ * Only triggers when the project still has the default 1920×1080 placeholder,
+ * meaning the user quick-created without choosing a resolution.
+ */
+function autoDetectProjectResolution(importedMedia: MediaMetadata[]): void {
+  const firstVideo = importedMedia.find(
+    (m) => m.mimeType.startsWith('video/') && m.width > 0 && m.height > 0
+  );
+  if (!firstVideo) return;
+
+  const { currentProject, updateProject } = useProjectStore.getState();
+  if (!currentProject) return;
+
+  // Only auto-detect if project has default placeholder dimensions
+  const { width, height } = currentProject.metadata;
+  if (width !== 1920 || height !== 1080) return;
+
+  // Pick closest valid FPS from presets
+  const validFps = [24, 25, 30, 50, 60, 120, 240];
+  const closestFps = validFps.reduce((prev, curr) =>
+    Math.abs(curr - firstVideo.fps) < Math.abs(prev - firstVideo.fps) ? curr : prev
+  );
+
+  logger.info(
+    `Auto-detecting project resolution: ${firstVideo.width}×${firstVideo.height} @ ${closestFps}fps from ${firstVideo.fileName}`
+  );
+
+  updateProject(currentProject.id, {
+    width: firstVideo.width,
+    height: firstVideo.height,
+    fps: closestFps,
+  }).catch((err) => {
+    logger.error('Failed to auto-detect project resolution:', err);
+  });
+}
 
 type Set = (
   partial:
@@ -198,6 +236,10 @@ export function createImportActions(
       unsupportedCodecs: unsupportedCodecFiles.length,
     });
 
+    if (importedCount > 0) {
+      autoDetectProjectResolution(results);
+    }
+
     return results;
   };
 
@@ -270,6 +312,10 @@ export function createImportActions(
           failed: failedCount,
           unsupportedCodecs: unsupportedCodecFiles.length,
         });
+
+        if (importedCount > 0) {
+          autoDetectProjectResolution(results);
+        }
 
         return results;
       } catch (error) {

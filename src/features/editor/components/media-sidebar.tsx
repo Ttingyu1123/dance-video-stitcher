@@ -18,9 +18,9 @@ import {
   AudioLines,
   FileOutput,
 } from 'lucide-react';
-import { AlignmentPanel, ConverterPanel } from '@/features/audio-alignment';
-import type { AlignmentResult } from '@/features/audio-alignment';
-import { resolveMediaUrl } from '@/features/media-library/utils/media-resolver';
+import { AlignmentPanel, ConverterPanel } from '../deps/audio-alignment';
+import type { AlignmentResult } from '../deps/audio-alignment';
+import { resolveMediaUrl } from '../deps/media-library-contract';
 import { useEditorStore } from '@/shared/state/editor';
 import { useTimelineStore } from '@/features/editor/deps/timeline-store';
 import { usePlaybackStore } from '@/shared/state/playback';

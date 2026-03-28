@@ -383,7 +383,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
   }, [activeTab, getMediaFilesForAlignment]);
 
   // Place clips on timeline after alignment
-  const handleAlignComplete = useCallback(async (results: AlignmentResult[], _refDuration: number) => {
+  const handleAlignComplete = useCallback(async (results: AlignmentResult[]) => {
     const { tracks, fps, addItem } = useTimelineStore.getState();
     const { selectItems } = useSelectionStore.getState();
     const { mediaItems } = useMediaLibraryStore.getState();
@@ -397,14 +397,14 @@ export const MediaSidebar = memo(function MediaSidebar() {
     const { removeItems } = useTimelineStore.getState();
     const existingItems = useTimelineStore.getState().items;
     if (existingItems.length > 0) {
-      console.log(`[AudioAlign] Removing ${existingItems.length} existing items`);
+      logger.info(`Removing ${existingItems.length} existing items`);
       removeItems(existingItems.map((item) => item.id));
     }
 
     const sortedResults = [...results].sort((a, b) => a.offset_sec - b.offset_sec);
     const newItemIds: string[] = [];
 
-    console.log('[AudioAlign] Placing clips:');
+    logger.info('Placing clips');
 
     for (let i = 0; i < sortedResults.length; i++) {
       const result = sortedResults[i]!;
@@ -419,7 +419,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
       );
 
       if (!media) {
-        console.warn(`[AudioAlign] No match for "${result.filename}" → "${originalName}". Library has: ${mediaItems.map(m => m.fileName).join(', ')}`);
+        logger.warn(`No match for "${result.filename}" → "${originalName}". Library has: ${mediaItems.map(m => m.fileName).join(', ')}`);
         continue;
       }
 
@@ -469,18 +469,19 @@ export const MediaSidebar = memo(function MediaSidebar() {
         blendMode: 'normal',
       };
 
-      console.log(`[AudioAlign] → "${media.fileName}" on ${targetTrack.name} at ${result.offset_sec.toFixed(1)}s (frame ${startFrame})`);
+      logger.info(`→ "${media.fileName}" on ${targetTrack.name} at ${result.offset_sec.toFixed(1)}s (frame ${startFrame})`);
 
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         addItem(item as any);
       } catch (err) {
-        console.error(`[AudioAlign] addItem failed for ${media.fileName}:`, err);
+        logger.error(`addItem failed for ${media.fileName}:`, err);
       }
     }
 
     if (newItemIds.length > 0) {
       selectItems(newItemIds);
-      console.log(`[AudioAlign] Done: placed ${newItemIds.length} clips`);
+      logger.info(`Done: placed ${newItemIds.length} clips`);
     }
   }, []);
 

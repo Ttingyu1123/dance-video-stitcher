@@ -9,7 +9,10 @@
  */
 import { useState, useCallback, useEffect } from 'react';
 import { Music, Wand2, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { createLogger } from '@/shared/logging/logger';
 import * as api from '../services/alignment-api';
+
+const logger = createLogger('AlignmentPanel');
 
 const METHOD_LABELS: Record<string, string> = {
   chroma: 'Chroma',
@@ -50,8 +53,8 @@ export function AlignmentPanel({ onAlignComplete, mediaFiles }: AlignmentPanelPr
       setStatus('Uploading reference...');
       await api.uploadReference(file);
       setStatus('Reference uploaded');
-    } catch (err: any) {
-      setError(`Reference upload failed: ${err.message}`);
+    } catch (err: unknown) {
+      setError(`Reference upload failed: ${err instanceof Error ? err.message : String(err)}`);
       setStatus('');
     }
   }, []);
@@ -99,16 +102,15 @@ export function AlignmentPanel({ onAlignComplete, mediaFiles }: AlignmentPanelPr
       setStatus('Analyzing audio alignment...');
 
       const analysisResult = await api.analyzeClips(paths);
-      // Debug: log raw results from backend
-      console.log('[AudioAlign] Raw results:', JSON.stringify(analysisResult.clips.map(c => ({
-        name: c.filename, offset: c.offset_sec, duration: c.duration_sec, confidence: c.confidence
-      })), null, 2));
+      logger.info('Alignment results', analysisResult.clips.map(c => ({
+        name: c.filename, offset: c.offset_sec, confidence: c.confidence, method: c.method
+      })));
       setResults(analysisResult.clips);
       setStatus(`Aligned ${analysisResult.clips.length} clips`);
 
       onAlignComplete(analysisResult.clips, analysisResult.reference_duration);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
       setStatus('');
     } finally {
       setIsUploading(false);
@@ -133,8 +135,8 @@ export function AlignmentPanel({ onAlignComplete, mediaFiles }: AlignmentPanelPr
       setResults(refined.clips);
       setStatus('Positions refined');
       onAlignComplete(refined.clips, refined.reference_duration);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsAnalyzing(false);
     }

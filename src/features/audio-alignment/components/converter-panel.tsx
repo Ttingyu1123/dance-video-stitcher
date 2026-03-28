@@ -61,8 +61,8 @@ export function ConverterPanel() {
       if (!res.ok) throw new Error(data.detail || 'Conversion failed');
       setDownloadUrl(`${API_BASE}${data.download_url}`);
       setOutputName(data.output_filename);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsConverting(false);
     }

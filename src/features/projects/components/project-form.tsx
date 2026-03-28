@@ -75,16 +75,21 @@ export function ProjectForm({
 
     setDetectStatus('Reading video...');
     const video = document.createElement('video');
-    video.preload = 'metadata';
+    video.preload = 'auto';
+    video.muted = true;
 
     const objectUrl = URL.createObjectURL(file);
-    video.src = objectUrl;
-
     const cleanup = () => URL.revokeObjectURL(objectUrl);
 
-    video.onloadedmetadata = () => {
+    const applyDetected = () => {
       const w = video.videoWidth;
       const h = video.videoHeight;
+
+      if (w === 0 || h === 0) {
+        setDetectStatus('Could not detect video dimensions. Try a different file.');
+        cleanup();
+        return;
+      }
 
       let detectedFps = 30;
 
@@ -97,7 +102,6 @@ export function ProjectForm({
       const matched = PROJECT_TEMPLATES.find((t) => t.width === w && t.height === h);
       if (matched) {
         setSelectedTemplateId(matched.id);
-        // Use template's FPS if it exists
         detectedFps = matched.fps;
         setValue('fps', detectedFps, { shouldValidate: true });
       } else {
@@ -115,10 +119,15 @@ export function ProjectForm({
       cleanup();
     };
 
+    // Use loadeddata (not loadedmetadata) — dimensions are reliably available here
+    video.onloadeddata = applyDetected;
+
     video.onerror = () => {
       setDetectStatus('Could not read video metadata. Try a different file.');
       cleanup();
     };
+
+    video.src = objectUrl;
   }, [setValue, watch]);
 
   const handleSelectTemplate = (template: ProjectTemplate) => {

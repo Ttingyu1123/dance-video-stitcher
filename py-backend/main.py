@@ -5,6 +5,12 @@ Audio alignment engine for FreeCut editor.
 
 import sys
 import os
+
+# Fix OpenBLAS multi-thread init deadlock on Python 3.14 + scipy
+# Must be set BEFORE importing numpy/scipy
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+
 import uvicorn
 
 # Ensure py-backend/ is the working directory

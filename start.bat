@@ -7,9 +7,13 @@ echo   Starting services...
 echo ================================================
 echo.
 
+:: Fix OpenBLAS deadlock on Python 3.14
+set OPENBLAS_NUM_THREADS=1
+set MKL_NUM_THREADS=1
+
 :: Start Python backend
 echo [1/2] Starting backend (port 8765)...
-start "VS-Backend" /min cmd /c "cd /d %~dp0py-backend && python main.py"
+start "VS-Backend" /min cmd /c "cd /d %~dp0py-backend && set OPENBLAS_NUM_THREADS=1 && set MKL_NUM_THREADS=1 && python main.py"
 
 timeout /t 2 /nobreak >nul
 

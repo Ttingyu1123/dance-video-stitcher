@@ -16,9 +16,14 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173.*LISTENING"') do (
     taskkill /F /PID %%a >nul 2>&1
 )
 
-:: Close the start.bat windows
-taskkill /fi "WINDOWTITLE eq VS-Backend" >nul 2>&1
-taskkill /fi "WINDOWTITLE eq VS-Editor" >nul 2>&1
+:: Close the start.bat cmd windows (title contains VS-Backend / VS-Editor)
+taskkill /fi "WINDOWTITLE eq VS-Backend*" /f >nul 2>&1
+taskkill /fi "WINDOWTITLE eq VS-Editor*" /f >nul 2>&1
+
+:: Also kill by window title pattern (python/node may change the title)
+for /f "tokens=2" %%a in ('tasklist /v /fi "WINDOWTITLE eq Dance Video Stitcher" /fo list ^| findstr "PID:"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
 
 echo.
 echo Done. All services stopped.

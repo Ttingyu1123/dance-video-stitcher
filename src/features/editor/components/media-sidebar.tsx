@@ -440,6 +440,14 @@ export const MediaSidebar = memo(function MediaSidebar() {
       const sourceDurationFrames = Math.round(media.duration * sourceFps);
       const sourceEndFrames = Math.round(result.duration_sec * sourceFps);
 
+      // Compute fit-to-canvas transform (same as normal drop)
+      const currentProject = useProjectStore.getState().currentProject;
+      const canvasW = currentProject?.metadata.width ?? 1920;
+      const canvasH = currentProject?.metadata.height ?? 1080;
+      const sourceW = media.width || canvasW;
+      const sourceH = media.height || canvasH;
+      const fitScale = Math.min(canvasW / sourceW, canvasH / sourceH);
+
       const item = {
         id: itemId,
         originId: crypto.randomUUID(),
@@ -449,24 +457,22 @@ export const MediaSidebar = memo(function MediaSidebar() {
         durationInFrames: durationFrames,
         mediaId: media.id,
         src: blobUrl,
-        fileName: media.fileName,
+        label: media.fileName,
         sourceStart: 0,
         sourceEnd: Math.min(sourceEndFrames, sourceDurationFrames),
         sourceDuration: sourceDurationFrames,
         sourceFps: sourceFps,
-        width: media.width,
-        height: media.height,
-        speed: 1,
+        sourceWidth: media.width || undefined,
+        sourceHeight: media.height || undefined,
         trimStart: 0,
         trimEnd: 0,
-        volume: 1,
-        isMuted: false,
         transform: {
-          x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1,
-          anchorX: 0.5, anchorY: 0.5,
+          x: 0,
+          y: 0,
+          width: Math.round(sourceW * fitScale),
+          height: Math.round(sourceH * fitScale),
+          rotation: 0,
         },
-        effects: [],
-        blendMode: 'normal',
       };
 
       logger.info(`→ "${media.fileName}" on ${targetTrack.name} at ${result.offset_sec.toFixed(1)}s (frame ${startFrame})`);

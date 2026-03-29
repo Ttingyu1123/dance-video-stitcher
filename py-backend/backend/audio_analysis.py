@@ -153,14 +153,11 @@ def cross_correlate_chroma(
         corr = fftconvolve(ref_chroma[i], clip_chroma[i, ::-1], mode="full")
         correlation += corr
 
-    # correlation[k] corresponds to offset (k - n_clip + 1) in STFT frames.
-    # Valid range: clip fully within reference → k from (n_clip-1) to (n_ref-1)
-    valid_start = n_clip - 1
+    # The peak in correlation corresponds to the best alignment
+    # Only consider valid offsets (clip fully within reference)
+    valid_start = 0
     valid_end = n_ref
     valid_correlation = correlation[valid_start:valid_end]
-
-    if len(valid_correlation) == 0:
-        return 0, 0.0
 
     peak_idx = int(np.argmax(valid_correlation))
     peak_value = valid_correlation[peak_idx]
@@ -173,7 +170,6 @@ def cross_correlate_chroma(
     else:
         confidence = 0.0
 
-    # peak_idx is relative to valid_start, which maps to offset 0
     return peak_idx, max(0.0, confidence)
 
 
@@ -318,16 +314,19 @@ def align_all_clips(
     temp_dir: str,
 ) -> list[ClipAlignment]:
     """
-    Full alignment pipeline using multi-method ensemble:
+    Full alignment pipeline:
     1. Extract audio from reference and all clips
-    2. Run chroma + MFCC + fingerprint methods in parallel
-    3. Pick best result per clip, refine with waveform correlation
-    4. Return sorted list of ClipAlignment objects
+    2. Compute chroma features
+    3. Cross-correlate each clip against reference (coarse)
+    4. Refine alignment with waveform correlation (fine)
+    5. Run ensemble methods in parallel for comparison
+    6. Return sorted list of ClipAlignment objects
     """
     # Extract and load reference audio
     ref_wav = os.path.join(temp_dir, "ref_audio.wav")
     extract_audio(ref_path, ref_wav)
     ref_audio = load_audio(ref_wav)
+    ref_chroma = compute_chroma(ref_audio)
 
     alignments = []
 
@@ -359,26 +358,37 @@ def align_all_clips(
         extract_audio(clip_path, clip_wav)
         clip_audio = load_audio(clip_wav)
 
-        # Run ensemble alignment (chroma + MFCC + fingerprint)
-        best, all_results = align_ensemble(clip_audio, ref_audio, SAMPLE_RATE)
+        # --- Primary: chroma cross-correlation + waveform refinement ---
+        clip_chroma = compute_chroma(clip_audio)
+        offset_frames, chroma_confidence = cross_correlate_chroma(clip_chroma, ref_chroma)
+        coarse_offset_sec = frames_to_seconds(offset_frames)
+        refined_offset_sec = refine_alignment(clip_audio, ref_audio, coarse_offset_sec)
+
+        # --- Secondary: ensemble methods for comparison ---
+        method_details = [
+            {"method": "chroma", "offset_sec": round(refined_offset_sec, 3),
+             "confidence": round(chroma_confidence, 3), "detail": "primary (chroma+refine)"}
+        ]
+        try:
+            _best, all_results = align_ensemble(clip_audio, ref_audio, SAMPLE_RATE)
+            for r in all_results:
+                method_details.append({
+                    "method": r.method, "offset_sec": r.offset_sec,
+                    "confidence": r.confidence, "detail": r.detail,
+                })
+        except Exception:
+            pass  # ensemble is optional, don't break alignment
 
         duration_sec = get_audio_duration(clip_audio)
-
-        # Store all method results for frontend display
-        method_details = [
-            {"method": r.method, "offset_sec": r.offset_sec,
-             "confidence": r.confidence, "detail": r.detail}
-            for r in all_results
-        ]
 
         alignment = ClipAlignment(
             clip_id=clip_id,
             filename=filename,
             file_path=clip_path,
-            offset_sec=best.offset_sec,
+            offset_sec=round(refined_offset_sec, 3),
             duration_sec=round(duration_sec, 3),
-            confidence=best.confidence,
-            method=best.method,
+            confidence=round(chroma_confidence, 3),
+            method="chroma",
             method_details=method_details,
         )
         alignments.append(alignment)

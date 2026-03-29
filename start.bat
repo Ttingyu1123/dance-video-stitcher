@@ -13,13 +13,13 @@ set MKL_NUM_THREADS=1
 
 :: Start Python backend
 echo [1/2] Starting backend (port 8765)...
-start /min cmd /c "title VS-Backend && cd /d %~dp0py-backend && set OPENBLAS_NUM_THREADS=1 && set MKL_NUM_THREADS=1 && python main.py"
+start /min cmd /c "cd /d %~dp0py-backend && set OPENBLAS_NUM_THREADS=1 && set MKL_NUM_THREADS=1 && python main.py"
 
 timeout /t 2 /nobreak >nul
 
 :: Start FreeCut editor
 echo [2/2] Starting editor (port 5173)...
-start /min cmd /c "title VS-Editor && cd /d %~dp0 && npm run dev"
+start /min cmd /c "cd /d %~dp0 && npm run dev"
 
 timeout /t 3 /nobreak >nul
 
@@ -31,9 +31,11 @@ echo.
 echo ================================================
 echo   Editor:  http://localhost:5173
 echo   Backend: http://localhost:8765
-echo   Close this window to stop all services.
+echo   Press any key to stop all services.
 echo ================================================
 
 pause >nul
-taskkill /fi "WINDOWTITLE eq VS-Backend" >nul 2>&1
-taskkill /fi "WINDOWTITLE eq VS-Editor" >nul 2>&1
+
+:: Stop everything by port
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8765.*LISTENING"') do taskkill /f /pid %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173.*LISTENING"') do taskkill /f /pid %%a >nul 2>&1

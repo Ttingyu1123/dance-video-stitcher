@@ -4,28 +4,27 @@ echo   Dance Video Stitcher - Stopping services...
 echo ================================================
 echo.
 
-:: Kill Python backend
-taskkill /f /im python.exe /fi "WINDOWTITLE eq VS-Backend" >nul 2>&1
+set found=0
 
-:: Kill Node/npm editor
-taskkill /f /fi "WINDOWTITLE eq VS-Editor" >nul 2>&1
-taskkill /f /im node.exe /fi "WINDOWTITLE eq VS-Editor" >nul 2>&1
-
-:: Fallback: kill by port
+:: Kill by port 8765 (backend) - kill entire process tree
 for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":8765.*LISTENING"') do (
-    echo Killing port 8765 (PID %%a)
-    taskkill /f /pid %%a >nul 2>&1
+    echo Stopping backend (PID %%a)...
+    taskkill /f /t /pid %%a >nul 2>&1
+    set found=1
 )
+
+:: Kill by port 5173 (editor) - kill entire process tree
 for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":5173.*LISTENING"') do (
-    echo Killing port 5173 (PID %%a)
-    taskkill /f /pid %%a >nul 2>&1
+    echo Stopping editor (PID %%a)...
+    taskkill /f /t /pid %%a >nul 2>&1
+    set found=1
 )
 
-:: Close the cmd windows by title
-timeout /t 1 /nobreak >nul
-taskkill /f /fi "WINDOWTITLE eq VS-Backend" >nul 2>&1
-taskkill /f /fi "WINDOWTITLE eq VS-Editor" >nul 2>&1
+if %found%==0 (
+    echo No services running.
+) else (
+    echo.
+    echo Done. All services stopped.
+)
 
-echo.
-echo Done.
 pause

@@ -56,13 +56,26 @@ export function ConverterPanel() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/convert`, { method: 'POST', body: fd });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 min
+
+      const res = await fetch(`${API_BASE}/api/convert`, {
+        method: 'POST',
+        body: fd,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Conversion failed');
       setDownloadUrl(`${API_BASE}${data.download_url}`);
       setOutputName(data.output_filename);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Conversion timed out (>10 min). Try a smaller file or lower quality.');
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setIsConverting(false);
     }

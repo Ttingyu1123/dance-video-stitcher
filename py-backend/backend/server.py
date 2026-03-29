@@ -569,12 +569,12 @@ async def convert_video(
     quality: str = Form("medium"),
 ):
     """Convert a video file: format, resolution, quality."""
-    # Save uploaded file
+    # Save uploaded file using streaming to handle large files
     file_id = f"conv_{uuid.uuid4().hex[:8]}_{file.filename}"
     input_path = UPLOAD_DIR / file_id
-    content = await file.read()
     with open(input_path, "wb") as out:
-        out.write(content)
+        while chunk := await file.read(1024 * 1024):  # 1MB chunks
+            out.write(chunk)
 
     # Generate output filename
     base_name = os.path.splitext(file.filename)[0]

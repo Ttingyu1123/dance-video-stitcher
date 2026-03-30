@@ -166,3 +166,16 @@ src/
 - **`__DEBUG__` API** — `window.__DEBUG__` (DEV-only, tree-shaken in prod) provides console debugging: `stores()`, `getTransitions()`, `getTransitionWindows()`, `getPlaybackState()`, `getTracks()`, `getMediaLibrary()`, `jitter()` (frame timing), `previewPerf()`, `transitionTrace()`, `prewarmCache()`, `filmstripMetrics()`, plus playback control (`seekTo`, `play`, `pause`). All use lazy `await import()` to avoid pulling in stores eagerly
 - **Transition prearm covers all types** — the `forceFastScrubOverlay` subscription uses `getPlayingAnyTransitionPrewarmStartFrame` (not complex-only) so all transitions get their session pinned and DOM video elements playing before entry. Also checks `getTransitionWindowForFrame` for playback starting inside an active transition
 - **Feature boundary rules** — features must not import from `@/lib/*` directly (use `@/infrastructure/` facades). Cross-feature imports must go through `deps/` adapter modules. The pre-push hook enforces both via `check:boundaries` and `check:legacy-lib-imports`
+
+
+## Available CLI Tools (OpenCLI)
+
+Run `opencli list` to discover all available CLI tools. Use `opencli <command> -f json` for structured output.
+
+Key commands:
+- `opencli list` — list all available tools (50+ sites, 200+ commands)
+- `opencli doctor` — check daemon/extension connectivity
+- `opencli <site> <action> --format json` — execute with JSON output
+- `opencli <site> <action> --format md` — execute with Markdown output
+
+> Requires: `npm install -g @jackwener/opencli`. Public commands work without Chrome Extension.
